@@ -1,0 +1,25 @@
+(add new changes on top of this file)
+08-03-18 Martin Holtz
+	* Added configuration parameter "debug"
+	* use now t3lib_div::locationHeaderUrl()
+
+07-12-23 Martin Holtz
+	* Writing the manual
+	* if config.baseUrl is not set, t3lib_div::getIndpEnv('TYPO3_SITE_URL') is be used
+	* some documentation inside the code
+
+07-12-12 Martin Holtz
+	* Quick Security-Bug-Fix: the amount of the basket has to be the same, which is payed via paypal, 
+	  otherwise the checkout is canceld (the payment not!)
+
+07-06-05 Martin Holtz
+	* Wie should use &useraction=commit
+
+07-06-04 Martin Holtz <typo3@martinholtz.de>
+	* Get the URL via config.baseURL
+	* deleted some debug-Code
+	* corrected error in ext_localconf.php
+
+07-05-29 Martin Holtz  <typo3@martinholtz.de>
+
+	* Initial release

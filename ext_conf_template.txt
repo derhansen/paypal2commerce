@@ -1,0 +1,12 @@
+# cat=basic; type=string; label=API_Endpoint (https://api-3t.paypal.com/nvp)
+api_endpoint = https://api-3t.sandbox.paypal.com/nvp
+# cat=basic; type=string; label=API_UserName
+api_username = 
+# cat=basic; type=string; label=API_Password
+api_password = 
+# cat=basic; type=string; label=API_Signature
+api_signature = 
+# cat=basic; type=string; label=Paypal URL (https://www.paypal.com/webscr&cmd=_express-checkout&useraction=commit&token=)
+paypal_url = https://www.sandbox.paypal.com/webscr&cmd=_express-checkout&useraction=commit&token=
+# cat=basic; type=string; label=Debug
+debug = 0
