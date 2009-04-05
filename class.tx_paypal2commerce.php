@@ -24,84 +24,166 @@
 
 require_once(PATH_t3lib.'class.t3lib_div.php');
 
+/**
+ * Paypal processsing class for TYPO3 extension commerce. Communication between
+ * shop und Paypal via HTTP GET (Name-Value Pair NVP).
+ *
+ */
 class tx_paypal2commerce {
+
+	/**
+	 * Keeps all currency codes accepted by PayPal's NVP.
+	 *
+	 * @var unknown_type
+	 */
+	var $acceptedCurrencies = array( 'AUD', 'CAD', 'EUR', 'GBP', 'JPY', 'USD' );
 	
+	/**
+	 * Keeps extension key.
+	 *
+	 * @var string
+	 */
+	var $ext_key = 'paypal2commerce';
+	
+	/**
+	 * Keeps plugin configuration.
+	 *
+	 * @var array
+	 */
 	var $paypal;
 
 	/**
+	 * Keeps commerce's checkout object.
 	 *
+	 * @var tx_commerce_pi3 TYPO3 extension commerce checkout object
 	 */
-	function needAdditionalData($pObj) {
-		return false;
-	}
-	
+	var $pObj;
+
+
 	/**
-	 * makes an call via curl to interact with paypal
-	 * code ist from 
-	 * https://www.paypal.com/en_US/ebook/PP_NVPAPI_DeveloperGuide/index.html
-	 * Paypal Examples
+	 * Verifies desired currencies to process and puts them into configuration.
+	 *
+	 * @param array $extConf       TYPO3 extension configuration
+	 * @param array $arrCurrencies array with currencies that are accepted by PayPal
 	 */
-	function hash_call($methodName,$nvpStr)
-	{
-		//declaring of global variables
-		$this->constants();
-		$API_Endpoint = $this->paypal['API_Endpoint'];
-		$version = $this->paypal['version'];
-		$API_UserName = $this->paypal['API_UserName'];
-		$API_Password = $this->paypal['API_Password'];
-		$API_Signature = $this->paypal['API_Signature'];
-	
-		//setting the curl parameters.
-		$ch = curl_init();
-		if (false === $ch) {
-			die('curl_init - Error #'.__LINE__);
+	function addCurrencies( &$extConf, &$arrCurrencies ) {
+		reset($extConf);
+		$keys = array_keys( $extConf, 1 );
+		while ( $key = current( $keys ) ) {
+			// matching three-digit currency code
+			if (preg_match( '/^payment_currency_([a-z]){3,3}/i', $key) ) {
+				$currencyCode = strtoupper( substr( $key, -3) );
+				if ( in_array ( $currencyCode, $this->acceptedCurrencies ))
+					array_push( $arrCurrencies, $currencyCode );
+			}
+			next($keys);
 		}
-		curl_setopt($ch, CURLOPT_URL,$API_Endpoint);
-		curl_setopt($ch, CURLOPT_VERBOSE, 1);
-	
-		//turning off the server and peer verification(TrustManager Concept).
-		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, $this->paypal['curl_verifypeer']);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, $this->paypal['curl_verifyhost']);
-	
-		curl_setopt($ch, CURLOPT_RETURNTRANSFER,1);
-		curl_setopt($ch, CURLOPT_POST, 1);
- 		curl_setopt($ch, CURLOPT_TIMEOUT, $this->paypal['curl_timeout']); 
-	
-		//NVPRequest for submitting to server
-		$nvpreq="METHOD=".urlencode($methodName)."&VERSION=".urlencode($version)."&PWD=".urlencode($API_Password)."&USER=".urlencode($API_UserName)."&SIGNATURE=".urlencode($API_Signature).$nvpStr;
-	
-		//setting the nvpreq as POST FIELD to curl
-		curl_setopt($ch,CURLOPT_POSTFIELDS,$nvpreq);
-		//getting response from server
-		$response = curl_exec($ch);
-		//converting NVPResponse to an Associative Array
-		$nvpResArray=$this->deformatNVP($response);
-		$nvpReqArray=$this->deformatNVP($nvpreq);
-		$_SESSION['nvpReqArray']=$nvpReqArray;
-	
-		if (curl_errno($ch)) {
-			// moving to display page to display curl errors
-			  $_SESSION['curl_error_no']=curl_errno($ch) ;
-			  $_SESSION['curl_error_msg']=curl_error($ch);
-// TODO: error Handling!
-			die('There is no Connection to Paypal possible? CURL is not enabled?');
-			  // header("Location: $location");
-		 } else {
-			 //closing the curl
-			curl_close($ch);
-		  }
-	
-		return $nvpResArray;
 	}
 
-	/** This function will take NVPString and convert it to an Associative Array and it will decode the response.
-	  * It is usefull to search for a particular key and displaying arrays.
-	  * code ist from 
-	  * https://www.paypal.com/en_US/ebook/PP_NVPAPI_DeveloperGuide/index.html
-	  * Paypal Examples
-	  * @nvpstr is NVPString.
-	  * @nvpArray is Associative Array.
-	  */
+	/**
+	 * Enables and sets proxy environment for cURL usage if needed.
+	 *
+	 * @param resource $cURLHandle initialized cURL ressource
+	 */
+	function checkCurlProxy( &$cURLHandle ) {
+		if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['curlUse']
+			&& isset( $GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyServer'] )
+			&& !empty( $GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyServer']) ) {
+				$arrProxy = explode( ':', $GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyServer'] );
+				curl_setopt( $cURLHandle, CURLOPT_PROXYPORT, intval( array_pop( $arrProxy ) ) );
+				curl_setopt( $cURLHandle, CURLOPT_PROXY, implode( ':', $arrProxy ) );
+			if (isset( $GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyUserPass'] )
+				&& !empty( $GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyUserPass'] ) ) {
+					curl_setopt( curl_setopt ( $cURLHandle, CURLOPT_PROXYUSERPWD, $GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyUserPass'] )  );
+				}
+		}
+	}
+
+	/**
+	 * Implements 3rd step of payment processing; it returns information about the customer, 
+	 * including name and address stored on PayPal.
+	 *
+	 * @return boolean true if step has been successful, otherwise false
+	 */
+	function checkFromPaypal() {
+		$token = urlencode ( $_REQUEST['token'] );
+		$paymentAmount =urlencode ($_REQUEST['paymentAmount']);
+		$paymentType = urlencode($_REQUEST['paymentType']);
+		$currCodeType = urlencode($_REQUEST['currencyCodeType']);
+		$payerID = urlencode($_REQUEST['PayerID']);
+		$serverName = urlencode($_SERVER['SERVER_NAME']);
+		$nvpstr='&TOKEN='.$token.'&PAYERID='.$payerID.'&PAYMENTACTION='.$paymentType.'&AMT='.$paymentAmount.'&CURRENCYCODE='.$currCodeType.'&IPADDRESS='.$serverName ;
+		$resArray=$this->hash_call("GetExpressCheckoutDetails",$nvpstr);
+		$this->resArray = $resArray;
+		$ack = strtoupper($resArray["ACK"]);
+		$returnResult = false;
+		//TODO address validation
+		try {
+			if($ack!="SUCCESS") {
+				throw new PaymentException( 'A paypal service3 error has occurred: ' . $resArray['L_SHORTMESSAGE0'], 
+					PAYERR_PAYPAL_SV,
+					array( 'error_no'  => intval( $resArray['L_ERRORCODE0'] ),
+						   'error_msg' => $resArray['L_LONGMESSAGE0']));
+			} else
+				$returnResult = true;
+		} catch (PaymentException $e) {
+			$this->debugAndLog($e);
+			header('Location: ' . $this->getPaymentErrorPageURL());
+			exit();
+		}
+    	return $returnResult;		
+	}
+
+	/**
+	 * Function retrieves extension configuration and puts it into class variables.
+	 * 
+	 * Authorize Payment URL:<br>
+	 * - Sandbox: https://www.sandbox.paypal.com/webscr&cmd=_express-checkout&token=<br>
+	 * - Live: https://www.paypal.com/webscr&cmd=_express-checkout&token=
+	 *
+	 */
+	function constants() {
+		$ext_conf = unserialize($GLOBALS['TYPO3_CONF_VARS']['EXT']['extConf'][$this->ext_key]);
+		$this->paypal['API_Endpoint'] = $ext_conf['api_endpoint'];
+		$this->paypal['version'] = '2.3';
+		$this->paypal['API_UserName'] = $ext_conf['api_username'];
+		$this->paypal['API_Password'] = $ext_conf['api_password'];
+		$this->paypal['API_Signature'] = $ext_conf['api_signature'];
+		$this->paypal['nvp_Header'] = '';
+		$this->paypal['PAYPAL_URL'] = $ext_conf['paypal_url'];
+		$this->paypal['currencies'] = array();
+		$this->addCurrencies( $ext_conf, $this->paypal['currencies'] );
+		$this->paypal['qualified_check'] = ( isset( $ext_conf['payment_qualified_check'] )? intval( $ext_conf['payment_qualified_check'] ) : 0 );
+		
+		// Setting Curl-Options
+		$this->paypal['curl_timeout'] = ( isset( $ext_conf['curl_timeout'] )? intval( $ext_conf['curl_timeout'] ) : 20 );
+		$this->paypal['curl_verifypeer'] = ( isset( $ext_conf['curl_verifypeer'] ) ? (boolean)$ext_conf['curl_verifypeer'] : false );
+		$this->paypal['curl_verifyhost'] = ( isset( $ext_conf['curl_verifyhost'] ) ? (boolean)$ext_conf['curl_verifyhost'] : false );
+	}
+
+	/**
+	 * Debugs and logs payment processing errors.
+	 *
+	 * @param PaymentException $exception Exception object
+	 */
+	function debugAndLog( $exception ) {
+			if ( $GLOBALS['TYPO3_CONF_VARS']['SYS']['enable_DLOG'] )
+				t3lib_div::devLog( $exception->getMessage(),
+								   $this->ext_key,
+								   3,
+								   array( $exception->getErrorNumber(),
+								   $exception->getDetails()) );
+			if ( $GLOBALS['TYPO3_CONF_VARS']['FE']['debug'] )
+				debug ( $exception->getMessage() );
+	}
+
+	/**
+	 * Transforms PayPal's Name-Value Pair string from URL into a (decoded) associative array.
+	 *
+	 * @param  string $nvpstr PayPal's Name-Value Pair string
+	 * @return array
+	 * @see                   https://www.paypal.com/en_US/ebook/PP_NVPAPI_DeveloperGuide/index.html
+	 */
 	function deformatNVP($nvpstr)
 	{
 		$intial=0;
@@ -121,48 +203,316 @@ class tx_paypal2commerce {
 	     }
 		return $nvpArray;
 	}
-	
-	
-	function constants() {
-/* Define the PayPal URL. This is the URL that the buyer is
-   first sent to to authorize payment with their paypal account
-   change the URL depending if you are testing on the sandbox
-   or going to the live PayPal site
-   For the sandbox, the URL is
-   https://www.sandbox.paypal.com/webscr&cmd=_express-checkout&token=
-   For the live site, the URL is
-   https://www.paypal.com/webscr&cmd=_express-checkout&token=
-   */
-		$ext_conf = unserialize($GLOBALS['TYPO3_CONF_VARS']['EXT']['extConf']['paypal2commerce']);
-		$this->paypal['API_Endpoint'] = $ext_conf['api_endpoint'];
-		$this->paypal['version'] = '2.3';
-		$this->paypal['API_UserName'] = $ext_conf['api_username'];
-		$this->paypal['API_Password'] = $ext_conf['api_password'];
-		$this->paypal['API_Signature'] = $ext_conf['api_signature'];
-		$this->paypal['nvp_Header'] = '';
-		$this->paypal['PAYPAL_URL'] = $ext_conf['paypal_url'];
-		// Seitting Curl-Options
-		$this->paypal['curl_timeout'] = (isset($ext_conf['curl_timeout'])?intval($ext_conf['curl_timeout']):20);
-		$this->paypal['curl_verifypeer'] = (isset($ext_conf['curl_verifypeer'])?(boolean)$ext_conf['curl_verifypeer']:false);
-		$this->paypal['curl_verifyhost'] = (isset($ext_conf['curl_verifyhost'])?(boolean)$ext_conf['curl_verifyhost']:false);
 
-		// Debugging Options
-		$this->paypal['debug'] = intval($ext_conf['debug']);
+	/**
+	 * This method is called in the last step. Here can be made some final checks or whatever is
+	 * needed to be done before saving some data in the database.
+	 * Write any errors into $this->errorMessages!
+	 * To save some additonal data in the database use the method updateOrder().
+	 *
+	 * @param  array	       $config  the configuration from the TYPO3_CONF_VARS
+	 * @param  array	       $session the session object
+	 * @param  array	       $basket  the basket object
+	 * @param  tx_commerce_pi3 $pObj    TYPO3 extension commerce checkout object
+	 * @return boolean	                true or false
+	 */
+	function finishingFunction($config,$session, $basket, $pObj ) {
+		if(!is_object($this->pObj)) {
+			$this->pObj = $pObj;
+		}
+		// ok, we get the form
+		if ('' != t3lib_div::_POST('tx_commerce_pi3')) {
+			$GLOBALS['TSFE']->fe_user->setKey('ses', 'comment', $pObj->piVars['comment']);
+			$GLOBALS["TSFE"]->storeSessionData();
+			$this->sendToPaypal( $basket->basket_sum_gross, $pObj->conf['currency'] );
+		}
+		if (!$this->checkFromPaypal()) {
+			return false;			
+		} else {
+			// do not forget the comment;!!!
+			$this->comment = $GLOBALS['TSFE']->fe_user->getKey('ses', 'comment');
+			$this->paymentRefId = 'CORRELATIONID'.$this->resArray['CORRELATIONID'].'PAYERID'.$this->resArray['PAYERID'];
+			return true;
+		}
 	}
 
 	/**
-	 * Sends the customer via header() to paypal.
+	 * This function returns field configuration for further data needed to fulfill payment process.
+	 *
+	 * @param  tx_commerce_pi3 $pObj TYPO3 extension commerce checkout object
+	 * @return array                 array with configuration of further (optional) field; currently always empty 
+	 * @see needAdditionalData()
+	 */
+	function getAdditonalFieldsConfig($pObj) {
+		if(!is_object($this->pObj)) {
+			$this->pObj = $pObj;
+		}
+		return array();
+	}
+
+	/**
+	 * Implements 4th and last step of payment processing, which means a request to obtain the payment.
+	 *
+	 * @return boolean true if payment processing was successful, otherwise false
+	 */
+	function getFromPaypal() {
+		$token = urlencode ( $_REQUEST['token'] );
+		$paymentAmount =urlencode ($_REQUEST['paymentAmount']);
+		$paymentType = urlencode($_REQUEST['paymentType']);
+		$currCodeType = urlencode($_REQUEST['currencyCodeType']);
+		$payerID = urlencode($_REQUEST['PayerID']);
+		$serverName = urlencode($_SERVER['SERVER_NAME']);
+		$nvpstr='&TOKEN='.$token.'&PAYERID='.$payerID.'&PAYMENTACTION='.$paymentType.'&AMT='.$paymentAmount.'&CURRENCYCODE='.$currCodeType.'&IPADDRESS='.$serverName ;
+		
+		try {
+			$basket = $GLOBALS['TSFE']->fe_user->tx_commerce_basket;
+				// check if amount has changed 
+			if (intval($basket->basket_sum_gross) != intval($_REQUEST['paymentAmount']*100)) {
+					// wrong sum
+				throw new PaymentException( 'A paypal service error has occurred: Amount mismatch', 
+					PAYERR_AMOUNT_MISMATCH,
+					array( 'error_no'  => PAYERR_AMOUNT_MISMATCH,
+						   'error_msg' => 'PAYPAL sum does not match basket sum'));
+			}
+			$resArray=$this->hash_call("DoExpressCheckoutPayment",$nvpstr);
+			$ack = strtoupper($resArray["ACK"]);
+			
+			$returnResult = false;
+		
+			if( $ack == "SUCCESS" ) {
+				if (intval($basket->basket_sum_gross) == intval($resArray['AMT'] * 100)) {
+					$GLOBALS['TSFE']->fe_user->setKey('ses', 'paypal2commerce_token', NULL );
+					$GLOBALS["TSFE"]->storeSessionData();
+					$returnResult = true;
+				} else {
+						// should not happen, has been checked before
+						// @TODO: cancel payment
+						// wrong sum
+					throw new PaymentException( 'A paypal service error has occurred: Amount mismatch', 
+						PAYERR_AMOUNT_MISMATCH,
+						array( 'error_no'  => PAYERR_AMOUNT_MISMATCH,
+							   'error_msg' => 'PAYPAL sum does not match basket sum'));
+				}
+			} else {
+				throw new PaymentException( 'A paypal service error has occurred: ' . $resArray['L_SHORTMESSAGE0'], 
+					PAYERR_PAYPAL_SV,
+					array( 'error_no'  => intval( $resArray['L_ERRORCODE0'] ),
+						   'error_msg' => $resArray['L_LONGMESSAGE0']));
+			}
+		} catch (PaymentException $e) {
+			$this->debugAndLog($e);
+			header('Location: ' . $this->getPaymentErrorPageURL());
+			exit();
+		}
+    	return $returnResult;
+	}
+
+	/**
+	 * Returns the last error message.
+	 *
+	 * @param  integer         $finish 
+	 * @param  tx_commerce_pi3 $pObj   TYPO3 extension commerce checkout object
+	 * @return mixed                   last error as array if not yet finished, otherwise joined string of errors
+	 * @see    
+	 */
+	function getLastError( $finish = 0, $pObj ) {
+		if ( !is_object( $this->pObj ) ) {
+			$this->pObj = $pObj;
+		}
+		if ( $finish ){
+		    return $this->getReadableError();
+		} else {
+			return $this->errorMessages[(count( $this->errorMessages ) - 1 )];
+		}
+	}
+
+	/**
+	 * Returns URL of configurable error page in case of payment service faults.
+	 *
+	 * @return string URL of error page
+	 */
+	function getPaymentErrorPageURL() {
+		$url = $GLOBALS["TSFE"]->config['config']['baseURL'];
+		$ext_conf = unserialize($GLOBALS['TYPO3_CONF_VARS']['EXT']['extConf'][$this->ext_key]);
+		$url .= $GLOBALS['TSFE']->cObj->typoLink_URL( array( 'parameter' => $ext_conf['payment_error_pid'] ) );
+		return $url;
+	}
+
+	/**
+	 * Returns all captured error messages.
+	 *
+	 * @return string joined string of single errors
+	 */
+	function getReadableError() {
+		$back = '';
+		reset( $this->errorMessages );
+	    	while( list( $k, $v ) = each( $this->errorMessages ) ){
+			$back .= $v;
+		}
+		return $back;
+	}
+
+	/**
+	 * Function usable to display a last message after processing a payment.
+	 *
+	 * @param	array	       $config  the configuration from the TYPO3_CONF_VARS
+	 * @param	array	       $session the session object
+	 * @param	array	       $basket  the basket object
+	 * @param  tx_commerce_pi3 $pObj    TYPO3 extension commerce checkout object
+	 * @return string                   text that is displayed after last processing step
+	 * @see                             hasSpecialFinishingForm()
+	 */
+	function getSpecialFinishingForm($config, $session, $basket,$pObj) {
+		$content = 'Error - there is something wrong... sorry, cannot finish your order.';;
+		return $content;
+	}
+
+	/**
+	 * Makes a call via cURL to interact with paypal.
+	 *
+	 * @param string $methodName PayPal's method name identifying a step of payment processing
+	 * @param string $nvpStr PayPal Name-Value Pair string part
+	 * @return array associative array derived from PayPal's Name-Value Pair
+	 * @see  https://www.paypal.com/en_US/ebook/PP_NVPAPI_DeveloperGuide/index.html
+	 */
+	function hash_call($methodName, $nvpStr)
+	{
+			// declaring of global variables
+		$this->constants();
+		$API_Endpoint = $this->paypal['API_Endpoint'];
+		$version = $this->paypal['version'];
+		$API_UserName = $this->paypal['API_UserName'];
+		$API_Password = $this->paypal['API_Password'];
+		$API_Signature = $this->paypal['API_Signature'];
+	
+			// setting the curl parameters.
+		$ch = curl_init();
+		if (false === $ch) {
+			die( 'curl_init - Error #' . __LINE__ );
+		}
+		curl_setopt( $ch, CURLOPT_URL, $API_Endpoint );
+		curl_setopt( $ch, CURLOPT_VERBOSE, 1 );
+	
+			// turning off the server and peer verification(TrustManager Concept).
+		curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, $this->paypal['curl_verifypeer'] );
+		curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, $this->paypal['curl_verifyhost'] );
+		
+		curl_setopt( $ch, CURLOPT_RETURNTRANSFER, 1 );
+		curl_setopt( $ch, CURLOPT_POST, 1 );
+ 		curl_setopt( $ch, CURLOPT_TIMEOUT, $this->paypal['curl_timeout'] );
+ 		
+ 			// configures cURL proxy if needed
+ 		$this->checkCurlProxy( $ch );
+	
+			// NVPRequest for submitting to server
+		$nvpreq="METHOD=".urlencode($methodName)."&VERSION=".urlencode($version)."&PWD=".urlencode($API_Password)."&USER=".urlencode($API_UserName)."&SIGNATURE=".urlencode($API_Signature).$nvpStr;
+		
+			// setting the nvpreq as POST FIELD to curl
+		curl_setopt($ch,CURLOPT_POSTFIELDS,$nvpreq);
+			// getting response from server
+		$response = curl_exec($ch);
+		$nvpResArray = array();
+		try {
+			if (!curl_errno($ch)) {
+				curl_close($ch);
+					// converting NVPResponse to an Associative Array
+				$nvpResArray=$this->deformatNVP($response);
+			 } else {
+				throw new PaymentException( 'A connection to paypal could not be established!', 
+											PAYERR_CURL_CONN,
+											array( 'error_no'  => intval( curl_errno($ch) ),
+												   'error_msg' => curl_error($ch)));
+			}
+		} catch (PaymentException $e) {
+			$this->debugAndLog($e);
+            header('Location: ' . $this->getPaymentErrorPageURL());
+            exit();
+		}
+		return $nvpResArray;
+	}
+
+	/**
+	 * Function used to call the processing method. This request was generated by
+	 * PayPal's returnurl functionality after customer chooses to pay.
+	 *
+	 * @param  array $_REQUEST       HTTP request variables
+	 * @param  tx_commerce_pi3 $pObj TYPO3 extension commerce checkout object
+	 * @return boolean               true if Paypal processing is finished otherwise falses
+	 * @see                          getSpecialFinishingForm()
+	 */
+	function hasSpecialFinishingForm( $_REQUEST, $pObj ) {
+		if ( !is_object($this->pObj) ) {
+			$this->pObj = $pObj;
+		}
+		// returning boolean true shows configurable page content, false finishes payment processing
+		if ( !empty( $_REQUEST['token'] ) )
+			return !$this->getFromPaypal();
+		else
+			return false;
+	}
+
+	/**
+	 * Checks if shop owner accepts given currency type.
+	 *
+	 * @param  string  $currencyCodeType three-digit currency code type
+	 * @return boolean                   true if currency type is accepted, otherwise false
+	 */
+	function isAllowedCurrency( $currencyCodeType ) {
+		if ( empty( $this->paypal ) )
+			$this->constants();
+		return in_array( $currencyCodeType, $this->paypal['currencies'] );
+	}
+
+	/**
+	 * Checks if further user supplied data is needed to process payment.
+	 * 
+	 * Returns always false (in case of PayPal).
+	 * 
+	 * @param  tx_commerce_pi3 $pObj      TYPO3 extension commerce checkout object
+	 * @see    getAdditonalFieldsConfig()
+	 */
+	function needAdditionalData( $pObj ) {
+		if ( !is_object($this->pObj) ) {
+			$this->pObj = $pObj;
+		}
+		return false;
+	}
+
+	/**
+	 * Function usable for validation of user-supplied date.
+	 *
+	 * @param  array           $formData user-supplied form data
+	 * @param  tx_commerce_pi3 $pObj     TYPO3 extension commerce checkout object
+	 * @return boolean                   true if data validation succeeds, otherwise false
+	 */
+	function proofData($formData,$pObj) {
+		if(!is_object($this->pObj)) {
+			$this->pObj = $pObj;
+		}
+		return true;
+	}
+
+	/**
+	 * Function initiates payment processing and redirects customer to PayPal website.
+	 *
+	 * @param integer $amount           total costs of basket in smallest payable unit (cents)
+	 * @param string  $currencyCodeType three-digit currency code
 	 */
 	function sendToPaypal($amount,$currencyCodeType = 'EUR') {
-		$paymentAmount=sprintf("%01.2f",($amount/100));
-		$currencyCodeType='EUR';
-		$paymentType='Sale'; 
-		/* The returnURL is the location where buyers return when a
-			payment has been succesfully authorized.
-			The cancelURL is the location buyers are sent to when they hit the
-			cancel button during authorization of payment during the PayPal flow
-		*/
-// todo: korrigieren!
+		try {
+			$paymentAmount = sprintf( "%01.2f",( $amount/100 ) );
+			$paymentType = 'Sale';
+			$currencyCodeType = strtoupper($currencyCodeType);
+			if ( !$this->isAllowedCurrency( $currencyCodeType ) )
+				throw new PaymentException( 'Paypal does not support this currency', 
+											PAYERR_WRONG_CURRENCY, 
+											array( 'error_no'  => intval( PAYERR_WRONG_CURRENCY ),
+												   'error_msg' => 'Desired checkout currency type is not supported by PayPal' ));
+		} catch (PaymentException $e) {
+			$this->debugAndLog($e);
+			header('Location: ' . $this->getPaymentErrorPageURL());
+			exit();
+		}
 		$step = 'payment';
 		$step = 'finish';
 		$conf = array();
@@ -176,214 +526,159 @@ class tx_paypal2commerce {
 		if ('/' != substr($baseurl,-1,1)) {
 			$baseurl .= '/';
 		}
-		// URL where the costomer will be send to, if the payment has been
-		// successfully authorized
+		// URL where the costomer will be send to, if the payment has been successfully authorized
 		$returnURL = urlencode($baseurl.$GLOBALS['TSFE']->cObj->typoLink_URL($conf));
 		$conf['additionalParams'] = '&paymentType='.$paymentType;
-		// URL where the costomer will be send to, if he canceld the payment
+		// URL where the costomer will be send to, if he cancels the payment
 		$cancelURL = urlencode($baseurl.$GLOBALS['TSFE']->cObj->typoLink_URL($conf));
 		
-		// Papyal Call - will be send via CURL
-		$nvpstr="&Amt=".$paymentAmount."&PAYMENTACTION=".$paymentType."&ReturnUrl=".$returnURL."&CANCELURL=".$cancelURL ."&CURRENCYCODE=".$currencyCodeType.'&address_override=1'.'&ADDRESSOVERRIDE=1';
+		// Paypal Call - will be send via CURL
+		$nvpstr="&Amt=".$paymentAmount."&PAYMENTACTION=".$paymentType."&ReturnUrl=".$returnURL."&CANCELURL=".$cancelURL ."&CURRENCYCODE=".$currencyCodeType;
+		
+		// Language-Settings
+		// @TODO: does not work? Why not?
+		$localcode = (isset($GLOBALS['TSFE']->tmpl->setup['config.']['paypal_language'])?$GLOBALS['TSFE']->tmpl->setup['config.']['paypal_language']:$GLOBALS['TSFE']->tmpl->setup['config.']['language']);
+		$nvpstr.= "&LOCALECODE=".strtoupper($localcode);
 
-		 /* Make the call to PayPal to set the Express Checkout token
-			If the API call succeded, then redirect the buyer to PayPal
-			to begin to authorize payment.  If an error occured, show the
-			resulting errors
-			*/
-		$resArray=$this->hash_call("SetExpressCheckout",$nvpstr);
-		$_SESSION['reshash']=$resArray;
+			// SET Address
+		$addresstyp = 'billing';
+		if (sizeof($this->pObj->MYSESSION['delivery']) > 0) $addresstyp = 'delivery';
+		$addr = $this->pObj->MYSESSION[$addresstyp];
 
-		$ack = strtoupper($resArray["ACK"]);
-
-		if($ack=="SUCCESS"){
-			// Redirect to paypal.com here
-			$token = urldecode($resArray["TOKEN"]);
-			$payPalURL = $this->paypal['PAYPAL_URL'].$token;
-			header("Location: ".t3lib_div::locationHeaderUrl($payPalURL));
-			exit();
-		} else  {
-			// Debugging? Print Errors end with an die
-			if (1 == $this->paypal['debug']) {
-				t3lib_div::debug('An Error occured - Paypal does not send ACK=SUCCESS');
-				t3lib_div::debug($resArray);
-				t3lib_div::debug('Hash-Call: '.$nvpstr);
-				die('NOACK');
-			} else {
-				// Jump to the cancelurl - via
-				// Typoscript and conditions it is possible to manage error
-				// message
-				$conf['additionalParams'] = '&paymentType=sale&paypal=noack';
-				$cancelURL = $baseurl.$GLOBALS['TSFE']->cObj->typoLink_URL($conf);
-				Header('Location: '.t3lib_div::locationHeaderUrl($cancelURL));
-				exit;
+		$nvpstr.= '&ADDROVERRIDE=1'; // do not override the address via paypal
+		$nvpstr.= '&SHIPTONAME='.urlencode($addr['name'].' '.$addr['surname']);
+		
+		$nvpstr.= '&SHIPTOSTREET='.urlencode($addr['address']);
+		$nvpstr.= '&SHIPTOCITY='.urlencode($addr['city']);
+		try {
+			// get Countrycode, Paypal needs 'DE' etc.
+			$res = $GLOBALS['TYPO3_DB']->exec_SELECTquery(
+				'cn_iso_2',
+				'static_countries',
+				'cn_iso_3=\''.$GLOBALS['TYPO3_DB']->quoteStr($addr['country']).'\'',
+				'',
+				'',
+				1);
+			if ($GLOBALS['TYPO3_DB']->sql_num_rows($res) != 1) {
+				throw new PaymentException('Selected Countrycode not available.', 
+						PAYERR_WRONG_COUNTRY);
 			}
-		}
-	}
+			$row = $GLOBALS['TYPO3_DB']->sql_fetch_assoc($res);
+			$nvpstr.= '&SHIPTOCOUNTRYCODE='.$row['cn_iso_2'];
+			$nvpstr.= '&SHIPTOZIP='.urlencode($addr['zip']);
+			$nvpstr.= '&PHONENUM='.urlencode($addr['phone']);
+			$nvpstr.= '&BUSINESS='.urlencode($addr['company']);
+			
+				// call to PayPal to get the Express Checkout token
+			$resArray = $this->hash_call("SetExpressCheckout",$nvpstr);
+			$_SESSION['reshash']=$resArray;
 	
-	/**
-	 * gibt bei success true zurück, sonst false
-	 */
-
-	function getFromPaypal() {
-		$token =urlencode( $_REQUEST['token']);
-		$paymentAmount =urlencode ($_REQUEST['paymentAmount']);
-		$paymentType = urlencode($_REQUEST['paymentType']);
-		$currCodeType = urlencode($_REQUEST['currencyCodeType']);
-		$payerID = urlencode($_REQUEST['PayerID']);
-		$serverName = urlencode($_SERVER['SERVER_NAME']);
-		$nvpstr='&TOKEN='.$token.'&PAYERID='.$payerID.'&PAYMENTACTION='.$paymentType.'&AMT='.$paymentAmount.'&CURRENCYCODE='.$currCodeType.'&IPADDRESS='.$serverName ;
-
-		$resArray=$this->hash_call("DoExpressCheckoutPayment",$nvpstr);
-
-		$ack = strtoupper($resArray["ACK"]);
-
-		if($ack!="SUCCESS") return false;
-		// BUGFIX
-		// check if the amount payed via paypal is the same, as the
-		// amount in the basket (otherwise the customer could pay less
-		// then he has ordered - if the merchant does not check the
-		// billing he would lose money
-		$basket = $GLOBALS['TSFE']->fe_user->tx_commerce_basket;
-		if ($basket->basket_sum_gross == $resArray['AMT']*100) {
-			return true;
-		}
-// TODO: Error Handling, maybe canceling the paypal transaction?
-/*
-		die('Bei Paypal wurde '. $resArray['AMT'].' überwiesen das sind '.($resArray['AMT']*100).' Cent und das ist nicht '.$basket->basket_sum_gross.'<br>');
-*/
-    		return false;
-	}
-	
-	function checkFromPaypal() {
-		$token =urlencode( $_REQUEST['token']);
-		$paymentAmount =urlencode ($_REQUEST['paymentAmount']);
-		$paymentType = urlencode($_REQUEST['paymentType']);
-		$currCodeType = urlencode($_REQUEST['currencyCodeType']);
-		$payerID = urlencode($_REQUEST['PayerID']);
-		$serverName = urlencode($_SERVER['SERVER_NAME']);
-		$nvpstr='&TOKEN='.$token.'&PAYERID='.$payerID.'&PAYMENTACTION='.$paymentType.'&AMT='.$paymentAmount.'&CURRENCYCODE='.$currCodeType.'&IPADDRESS='.$serverName ;
-		$resArray=$this->hash_call("GetExpressCheckoutDetails",$nvpstr);
-		$this->resArray = $resArray;
-		$ack = strtoupper($resArray["ACK"]);
-		if($ack!="SUCCESS") return false;
-    		return true;		
-	}
-
-	function getAdditonalFieldsConfig($pObj) {
-		if(!is_object($this->pObj)) {
-			$this->pObj = $pObj;
-		}
-		return array();
-	}
-
-
-	function getSpecialFinishingForm($config, $session, $basket,$pObj) {
-		$content = 'Error - there is something wrong... sorry, cannot finish your order.';;
-		return $content;
-	}
-	
-	function hasSpecialFinishingForm($_REQUEST,$pObj) {
-		if (!empty($_REQUEST['token'])) {
-			// redirect from paypal
-			if ($this->getFromPaypal()) {
-				// Erfolgreich
-				$result = true;
-				return false; // Abschließen
-			} else {
-				// FEHLER
-// TODO: Error handling
-				$this->errorMessages['startPaypal'] = 'Error...';
-				$result = false;
-				return true; // Formular anzeigen!
+			$ack = strtoupper($resArray["ACK"]);
+				
+			if($ack=="SUCCESS"){
+					// Redirect to paypal.com here
+				$token = urldecode($resArray["TOKEN"]);
+				$GLOBALS['TSFE']->fe_user->setKey('ses', 'paypal2commerce_token', $token );
+				$GLOBALS['TSFE']->storeSessionData();
+				$payPalURL = $this->paypal['PAYPAL_URL'].$token;
+				header("Location: ".$payPalURL);
+				exit();
+			} else  {
+				throw new PaymentException( 'A paypal service error has occurred: ' . $resArray['L_SHORTMESSAGE0'], 
+					PAYERR_PAYPAL_SV,
+					array( 'error_no'  => intval( $resArray['L_ERRORCODE0'] ),
+						   'error_msg' => $resArray['L_LONGMESSAGE0']));
+					
 			}
-		} 
-	}
-
-
-	function proofData($formData,$pObj) {
-		if(!is_object($this->pObj)) {
-			$this->pObj = $pObj;
-		}
-		return true;
-	}
-	
-	/**
-	 * This method is called in the last step. Here can be made some final checks or whatever is
-	 * needed to be done before saving some data in the database.
-	 * Write any errors into $this->errorMessages!
-	 * To save some additonal data in the database use the method updateOrder().
-	 *
-	 * @param	array	$config: The configuration from the TYPO3_CONF_VARS
-	 * @param	array	$basket: The basket object
-	 *
-	 * @return boolean	True or false
-	 */
-	function finishingFunction($config,$session, $basket,$pObj) {
-		if(!is_object($this->pObj)) {
-			$this->pObj = $pObj;
-		}
-		// ok, we get the form
-		if ('' != t3lib_div::_POST('tx_commerce_pi3')) {
-			$GLOBALS['TSFE']->fe_user->setKey('ses', 'comment', $pObj->piVars['comment']);
-			$GLOBALS["TSFE"]->storeSessionData();
-			$this->sendToPaypal($basket->basket_sum_gross);
+		} catch (PaymentException $e) {
+            $this->debugAndLog($e);
+			header('Location: ' . $this->getPaymentErrorPageURL());
 			exit();
 		}
-		if (!$this->checkFromPaypal()) {
-			return false;			
-		} else {
-			// do not forget the comment;)
-			$this->comment = $GLOBALS['TSFE']->fe_user->getKey('ses', 'comment');
-			$this->paymentRefId = 'CORRELATIONID'.$this->resArray['CORRELATIONID'].'PAYERID'.$this->resArray['PAYERID'];
-			return true;
-		}
 	}
-	
+
 	/**
-	 * 
-	 * Saveing the Order - Storing Paypal payment_ref_id and the comment
+	 * Function usable for storing additional data (payment_ref_id, comment) of an order into database.
+	 *
+	 * @param integer         $orderUid order unique identified
+	 * @param object          $session  session object
+	 * @param tx_commerce_pi3 $pObj     TYPO3 extension commerce checkout object
 	 */
 	function updateOrder($orderUid, $session,$pObj) {
 		if(!is_object($this->pObj)) {
 			$this->pObj = $pObj;
 		}
 		$GLOBALS['TYPO3_DB']->exec_UPDATEquery(
-			'tx_commerce_orders','uid = '.$orderUid,
+			'tx_commerce_orders','uid = '. intval( $orderUid ),
 			array('payment_ref_id' => $this->paymentRefId, 'comment' => $this->comment)
 		);
 	}
-	
-	/**
-	 * Returns the last error message
-	 */
-	function getLastError($finish = 0,$pObj) {
-		if(!is_object($this->pObj)) {
-			$this->pObj = $pObj;
-		}
-		if($finish){
-		    return $this->getReadableError();
-		}else{
-			return $this->errorMessages[(count($this->errorMessages) -1)];
-		}
-	}
-	
-	// creditcard Error Code Handling
-	function getReadableError(){
-		$back = '';
-		reset($this->errorMessages);
-	    	while(list($k,$v) =each($this->errorMessages)){
-			$back .= $v;
-		}
-		return $back;
-	
-	}
-	
-	
 }
+
+
+@define(PAYERR_CURL_CONN, 0x66661);
+@define(PAYERR_PAYPAL_SV, 0x66662);
+@define(PAYERR_WRONG_CURRENCY, 0x66663);
+@define(PAYERR_AMOUNT_MISMATCH, 0x66664);
+@define(PAYERR_WRONG_COUNTRY, 0x66665);
+
+/**
+ * Class for Payment Exceptions.
+ *
+ */
+class PaymentException extends Exception
+{
+
+	/**
+	 * Keeps exception details.
+	 *
+	 * @var array
+	 */
+    protected $details;
+
+
+	/**
+	 * Calling class constructor.
+	 *
+	 * @param string $message    exception message
+	 * @param integer $code      exception identifier represented as hexadecimal number
+	 * @param mixed $details     array of exception details
+	 */
+	public function __construct($message, $code = 0, $details='') {
+		parent::__construct($message, $code);
+		$this->details = $details;
+    }
+
+    /**
+     * Returns string representation of the exception
+     *
+     * @return string serialized exception object
+     */
+    public function __toString() {
+        return __CLASS__ . ": [{$this->code}]: {$this->message}\n";
+    }
+
+    /**
+     * Returns error number of exception.
+     *
+     * @return integer error number of exception
+     */
+    public function getErrorNumber() {
+    	return $this->details['error_no'];
+    }
+
+    /**
+     * Returns exception details.
+     *
+     * @return string exception details
+     */
+    public function getDetails() {
+        return $this->details['error_msg'];
+    }
+}
+
 
 if (defined('TYPO3_MODE') && $TYPO3_CONF_VARS[TYPO3_MODE]['XCLASS']["ext/paypal2commerce/class.tx_paypal2commerce.php"])	{
 	include_once($TYPO3_CONF_VARS[TYPO3_MODE]['XCLASS']["ext/paypal2commerce/class.tx_paypal2commerce.php"]);
 }
-
 ?>

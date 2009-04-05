@@ -19,6 +19,12 @@ curl_setopt($curl, CURLOPT_AUTOREFERER, true);
 curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
 curl_setopt($curl, CURLOPT_TIMEOUT, 10);
 
+/* Proxy configuration (userpasswd optional)
+	curl_setopt( $curl, CURLOPT_PROXYPORT, 8080 );
+	curl_setopt( $curl, CURLOPT_PROXY, 'http://127.0.0.1' );
+	curl_setopt( curl_setopt ( $ch, CURLOPT_PROXYUSERPWD, 'user:passwd' );
+ */
+
 $html = curl_exec($curl); // execute the curl command
 curl_close($curl); // close the connection
 
@@ -27,6 +33,6 @@ if (strlen($html) < 100) {
 	die('There was something wrong - '.$url.' could not be fetched?');
 } 
 
-echo 'Have an look at TYPO3.org<br>';
+echo 'You should now see typo3.org - gratulations CURL works.<br>';
 echo $html;
 ?> 

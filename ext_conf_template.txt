@@ -8,5 +8,19 @@ api_password =
 api_signature = 
 # cat=basic; type=string; label=Paypal URL (https://www.paypal.com/webscr&cmd=_express-checkout&useraction=commit&token=)
 paypal_url = https://www.sandbox.paypal.com/webscr&cmd=_express-checkout&useraction=commit&token=
+# cat=basic/enable; type=boolean; label=Enable payments by currency AUD
+payment_currency_aud = 0
+# cat=basic/enable; type=boolean; label=Enable payments by currency CAD
+payment_currency_cad = 0
+# cat=basic/enable; type=boolean; label=Enable payments by currency EUR
+payment_currency_eur = 1
+# cat=basic/enable; type=boolean; label=Enable payments by currency GBP
+payment_currency_gbp = 0
+# cat=basic/enable; type=boolean; label=Enable payments by currency JPY
+payment_currency_jpy = 0
+# cat=basic/enable; type=boolean; label=Enable payments by currency USD
+payment_currency_usd = 0
+# cat=basic/other; type=int; label=Payment error PID: Defines the page ID to redirect to in case of processing errors
+payment_error_pid =
 # cat=basic; type=string; label=Debug
 debug = 0
