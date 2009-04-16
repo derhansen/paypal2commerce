@@ -1,4 +1,7 @@
 (add new changes on top of this file)
+09-04-16 Martin Holtz
+	* quoteStr needs parameter "table" too - thanks to Martin-Pierre Frenette
+
 08-03-18 Martin Holtz
 	* Added configuration parameter "debug"
 	* use now t3lib_div::locationHeaderUrl()

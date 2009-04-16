@@ -555,7 +555,7 @@ class tx_paypal2commerce {
 			$res = $GLOBALS['TYPO3_DB']->exec_SELECTquery(
 				'cn_iso_2',
 				'static_countries',
-				'cn_iso_3=\''.$GLOBALS['TYPO3_DB']->quoteStr($addr['country']).'\'',
+				'cn_iso_3=\''.$GLOBALS['TYPO3_DB']->quoteStr($addr['country'], 'static_countries').'\'',
 				'',
 				'',
 				1);
