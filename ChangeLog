@@ -1,4 +1,7 @@
 (add new changes on top of this file)
+09-04-28 Martin Holtz
+	* added SHIPTOSTATE to address - thanks to Martin-Pierre Frenette
+
 09-04-16 Martin Holtz
 	* quoteStr needs parameter "table" too - thanks to Martin-Pierre Frenette
 

@@ -550,6 +550,11 @@ class tx_paypal2commerce {
 		
 		$nvpstr.= '&SHIPTOSTREET='.urlencode($addr['address']);
 		$nvpstr.= '&SHIPTOCITY='.urlencode($addr['city']);
+			//Added by Martin-Pierre Frenette
+		if (isset($addr['region'])) {
+			$nvpstr.= '&SHIPTOSTATE='.urlencode($addr['region']);
+		}
+		
 		try {
 			// get Countrycode, Paypal needs 'DE' etc.
 			$res = $GLOBALS['TYPO3_DB']->exec_SELECTquery(
