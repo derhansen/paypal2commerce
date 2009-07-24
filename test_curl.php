@@ -1,5 +1,5 @@
 <?php
-die('This Skript should be disabled, after testing CURL');
+die('This Skript is disabled in '.__FILE__.' line '.__LINE__.'. Do not forgt to disable this script after testing CURL');
 
 // Testing CURL
 
