@@ -1,6 +1,7 @@
 (add new changes on top of this file)
 10-05-03 Martin Holtz
 	* fixed bug #5067 thanks to Michael Staatz
+	* fixed bug #4995 thanks to Robert Heel
 	
 09-04-28 Martin Holtz
 	* added SHIPTOSTATE to address - thanks to Martin-Pierre Frenette

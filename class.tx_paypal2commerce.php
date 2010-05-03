@@ -106,11 +106,11 @@ class tx_paypal2commerce {
 	 * @return boolean true if step has been successful, otherwise false
 	 */
 	function checkFromPaypal() {
-		$token = urlencode ( $_REQUEST['token'] );
-		$paymentAmount =urlencode ($_REQUEST['paymentAmount']);
-		$paymentType = urlencode($_REQUEST['paymentType']);
-		$currCodeType = urlencode($_REQUEST['currencyCodeType']);
-		$payerID = urlencode($_REQUEST['PayerID']);
+		$token = urlencode(t3lib_div::_GP('token'));
+		$paymentAmount =urlencode(t3lib_div::_GP('paymentAmount'));
+		$paymentType = urlencode(t3lib_div::_GP('paymentType'));
+		$currCodeType = urlencode(t3lib_div::_GP('currencyCodeType'));
+		$payerID = urlencode(t3lib_div::_GP('PayerID'));
 		$serverName = urlencode($_SERVER['SERVER_NAME']);
 		$nvpstr='&TOKEN='.$token.'&PAYERID='.$payerID.'&PAYMENTACTION='.$paymentType.'&AMT='.$paymentAmount.'&CURRENCYCODE='.$currCodeType.'&IPADDRESS='.$serverName ;
 		$resArray=$this->hash_call("GetExpressCheckoutDetails",$nvpstr);
@@ -124,8 +124,9 @@ class tx_paypal2commerce {
 					PAYERR_PAYPAL_SV,
 					array( 'error_no'  => intval( $resArray['L_ERRORCODE0'] ),
 						   'error_msg' => $resArray['L_LONGMESSAGE0']));
-			} else
+			} else {
 				$returnResult = true;
+			}
 		} catch (PaymentException $e) {
 			$this->debugAndLog($e);
 			header('Location: ' . $this->getPaymentErrorPageURL());
@@ -256,11 +257,11 @@ class tx_paypal2commerce {
 	 * @return boolean true if payment processing was successful, otherwise false
 	 */
 	function getFromPaypal() {
-		$token = urlencode ( $_REQUEST['token'] );
-		$paymentAmount =urlencode ($_REQUEST['paymentAmount']);
-		$paymentType = urlencode($_REQUEST['paymentType']);
-		$currCodeType = urlencode($_REQUEST['currencyCodeType']);
-		$payerID = urlencode($_REQUEST['PayerID']);
+		$token = urlencode(t3lib_div::_GP('token'));
+		$paymentAmount =urlencode(t3lib_div::_GP('paymentAmount'));
+		$paymentType = urlencode(t3lib_div::_GP('paymentType'));
+		$currCodeType = urlencode(t3lib_div::_GP('currencyCodeType'));
+		$payerID = urlencode(t3lib_div::_GP('PayerID'));
 		$serverName = urlencode($_SERVER['SERVER_NAME']);
 		$nvpstr='&TOKEN='.$token.'&PAYERID='.$payerID.'&PAYMENTACTION='.$paymentType.'&AMT='.$paymentAmount.'&CURRENCYCODE='.$currCodeType.'&IPADDRESS='.$serverName ;
 		
@@ -444,8 +445,9 @@ class tx_paypal2commerce {
 		if ( !is_object($this->pObj) ) {
 			$this->pObj = $pObj;
 		}
+		$token=t3lib_div::_GP('token');
 		// returning boolean true shows configurable page content, false finishes payment processing
-		if ( !empty( $_REQUEST['token'] ) )
+		if ( !empty( $token ) )
 			return !$this->getFromPaypal();
 		else
 			return false;
@@ -505,9 +507,9 @@ class tx_paypal2commerce {
 			$currencyCodeType = strtoupper($currencyCodeType);
 			if ( !$this->isAllowedCurrency( $currencyCodeType ) )
 				throw new PaymentException( 'Paypal does not support this currency', 
-											PAYERR_WRONG_CURRENCY, 
-											array( 'error_no'  => intval( PAYERR_WRONG_CURRENCY ),
-												   'error_msg' => 'Desired checkout currency type is not supported by PayPal' ));
+					PAYERR_WRONG_CURRENCY, 
+					array( 'error_no'  => intval( PAYERR_WRONG_CURRENCY ),
+					'error_msg' => 'Desired checkout currency type is not supported by PayPal' ));
 		} catch (PaymentException $e) {
 			$this->debugAndLog($e);
 			header('Location: ' . $this->getPaymentErrorPageURL());
