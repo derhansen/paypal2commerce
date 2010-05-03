@@ -542,7 +542,9 @@ class tx_paypal2commerce {
 
 			// SET Address
 		$addresstyp = 'billing';
-		if (sizeof($this->pObj->MYSESSION['delivery']) > 0) $addresstyp = 'delivery';
+		if (is_array($this->pObj->MYSESSION['delivery']) && sizeof($this->pObj->MYSESSION['delivery']) > 0) {
+		    $addresstyp = 'delivery';
+		}
 		$addr = $this->pObj->MYSESSION[$addresstyp];
 
 		$nvpstr.= '&ADDROVERRIDE=1'; // do not override the address via paypal
