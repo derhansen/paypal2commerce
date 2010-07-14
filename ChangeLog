@@ -1,4 +1,8 @@
 (add new changes on top of this file)
+10.07-14 Martin Holtz
+	* better error messages
+	* set to version 0.5 
+	
 10-05-03 Martin Holtz
 	* fixed bug #5067 thanks to Michael Staatz
 	* fixed bug #4995 thanks to Robert Heel
@@ -8,6 +12,10 @@
 
 09-04-16 Martin Holtz
 	* quoteStr needs parameter "table" too - thanks to Martin-Pierre Frenette
+
+09-04-05 Martin Holtz
+	* integration of the changes from marcus krause (error handling and a lot more, thanks!)
+	* requirements raised to php5
 
 08-03-18 Martin Holtz
 	* Added configuration parameter "debug"

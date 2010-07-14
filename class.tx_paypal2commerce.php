@@ -2,7 +2,7 @@
 /***************************************************************
  *  Copyright notice
  *
- *  (c) 2005 - 2007 Martin Holtz typo3@martinholtz.de
+ *  (c) 2005 - 2010 Martin Holtz typo3@martinholtz.de (et al)
  *  All rights reserved
  *
  *  This script is part of the TYPO3 project. The TYPO3 project is
