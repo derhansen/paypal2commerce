@@ -223,7 +223,7 @@ class tx_paypal2commerce {
 		}
 		// ok, we get the form
 		if ('' != t3lib_div::_POST('tx_commerce_pi3')) {
-			$GLOBALS['TSFE']->fe_user->setKey('ses', 'comment', $pObj->piVars['comment']);
+			$GLOBALS['TSFE']->fe_user->setKey('ses', 'comment', t3lib_div::removeXSS(strip_tags($pObj->piVars['comment'])));
 			$GLOBALS["TSFE"]->storeSessionData();
 			$this->sendToPaypal( $basket->basket_sum_gross, $pObj->conf['currency'] );
 		}
