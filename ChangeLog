@@ -1,5 +1,8 @@
 (add new changes on top of this file)
-10.07-14 Martin Holtz
+10-07-17 Martin Holtz
+    * comment is now avaiable in confirmation e-mail 
+    
+10-07-14 Martin Holtz
 	* better error messages
 	* set to version 0.5 
 	
