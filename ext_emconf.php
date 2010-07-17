@@ -3,7 +3,7 @@
 ########################################################################
 # Extension Manager/Repository config file for ext "paypal2commerce".
 #
-# Auto generated 03-05-2010 19:59
+# Auto generated 14-07-2010 19:51
 #
 # Manual updates:
 # Only the data in the array - everything else is removed by next
@@ -41,7 +41,7 @@ $EM_CONF[$_EXTKEY] = array(
 		'suggests' => array(
 		),
 	),
-	'_md5_values_when_last_written' => 'a:11:{s:9:"ChangeLog";s:4:"aa91";s:10:"README.txt";s:4:"b2b5";s:28:"class.tx_paypal2commerce.php";s:4:"b3f5";s:21:"ext_conf_template.txt";s:4:"1583";s:12:"ext_icon.gif";s:4:"1bdc";s:17:"ext_localconf.php";s:4:"c1ef";s:20:"locallang_paypal.xml";s:4:"1e5a";s:13:"test_curl.php";s:4:"0e9a";s:14:"doc/manual.sxw";s:4:"0554";s:19:"doc/wizard_form.dat";s:4:"34d6";s:20:"doc/wizard_form.html";s:4:"51a9";}',
+	'_md5_values_when_last_written' => 'a:11:{s:9:"ChangeLog";s:4:"a11f";s:10:"README.txt";s:4:"b2b5";s:28:"class.tx_paypal2commerce.php";s:4:"24d2";s:21:"ext_conf_template.txt";s:4:"1583";s:12:"ext_icon.gif";s:4:"1bdc";s:17:"ext_localconf.php";s:4:"c1ef";s:20:"locallang_paypal.xml";s:4:"1e5a";s:13:"test_curl.php";s:4:"0e9a";s:14:"doc/manual.sxw";s:4:"0554";s:19:"doc/wizard_form.dat";s:4:"34d6";s:20:"doc/wizard_form.html";s:4:"51a9";}',
 	'suggests' => array(
 	),
 );

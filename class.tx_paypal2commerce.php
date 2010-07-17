@@ -232,6 +232,8 @@ class tx_paypal2commerce {
 		} else {
 			// do not forget the comment;!!!
 			$this->comment = $GLOBALS['TSFE']->fe_user->getKey('ses', 'comment');
+			// in saveOrder() the comment is expected in the piVars
+			$this->pObj->piVars['comment'] = $this->comment;
 			$this->paymentRefId = 'CORRELATIONID'.$this->resArray['CORRELATIONID'].'PAYERID'.$this->resArray['PAYERID'];
 			return true;
 		}
