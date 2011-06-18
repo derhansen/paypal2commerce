@@ -1,4 +1,6 @@
 (add new changes on top of this file)
+11-06-18 Martin Holtz
+	* fixed Bug #10011, thanks to Georg Schönweger and Simon Schick
 10-07-17 Martin Holtz
     * comment is now avaiable in confirmation e-mail 
     
