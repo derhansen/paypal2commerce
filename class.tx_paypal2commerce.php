@@ -168,14 +168,17 @@ class tx_paypal2commerce {
 	 * @param PaymentException $exception Exception object
 	 */
 	function debugAndLog( $exception ) {
-		if ( $GLOBALS['TYPO3_CONF_VARS']['SYS']['enable_DLOG'] )
-		t3lib_div::devLog( $exception->getMessage(),
-		$this->ext_key,
-		3,
-		array( $exception->getErrorNumber(),
-		$exception->getDetails()) );
-		if ( $GLOBALS['TYPO3_CONF_VARS']['FE']['debug'] )
-		debug ( $exception->getMessage() );
+		if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['enable_DLOG'] ) {
+			t3lib_div::devLog(
+			$exception->getMessage(),
+			$this->ext_key,
+			3,
+			array( $exception->getErrorNumber(), $exception->getDetails())
+			);
+			if ( $GLOBALS['TYPO3_CONF_VARS']['FE']['debug'] ) {
+				debug ( $exception->getMessage() );
+			}
+		}
 	}
 
 	/**
@@ -252,7 +255,7 @@ class tx_paypal2commerce {
 		}
 		return array();
 	}
-	
+
 	/**
 	 * checks if two values are equal
 	 *
@@ -281,20 +284,20 @@ class tx_paypal2commerce {
 		try {
 			$basket = $GLOBALS['TSFE']->fe_user->tx_commerce_basket;
 			// check if amount has changed
-			if ($this->amountEqual($basket->basket_sum_gross, $_REQUEST['paymentAmount']*100)) {
+			if (!$this->amountEqual($basket->basket_sum_gross, $_REQUEST['paymentAmount']*100)) {
 				// wrong sum
 				throw new PaymentException( 'A paypal service error has occurred: Amount mismatch',
 				PAYERR_AMOUNT_MISMATCH,
 				array( 'error_no'  => PAYERR_AMOUNT_MISMATCH,
-						   'error_msg' => 'PAYPAL sum does not match basket sum'));
+						   'error_msg' => 'PAYPAL sum does not match basket sum (1)'));
 			}
 			$resArray=$this->hash_call("DoExpressCheckoutPayment",$nvpstr);
 			$ack = strtoupper($resArray["ACK"]);
-				
+
 			$returnResult = false;
 
 			if( $ack == "SUCCESS" ) {
-				
+
 				if ($this->amountEqual($basket->basket_sum_gross, $resArray['AMT']*100)) {
 					$GLOBALS['TSFE']->fe_user->setKey('ses', 'paypal2commerce_token', NULL );
 					$GLOBALS["TSFE"]->storeSessionData();
@@ -303,10 +306,13 @@ class tx_paypal2commerce {
 					// should not happen, has been checked before
 					// @TODO: cancel payment
 					// wrong sum
-					throw new PaymentException( 'A paypal service error has occurred: Amount mismatch',
+					throw new PaymentException(
+						'A paypal service error has occurred: Amount mismatch',
 					PAYERR_AMOUNT_MISMATCH,
-					array( 'error_no'  => PAYERR_AMOUNT_MISMATCH,
-							   'error_msg' => 'PAYPAL sum does not match basket sum'));
+					array(  'error_no'  => PAYERR_AMOUNT_MISMATCH,
+								'error_msg' => 'PAYPAL sum does not match basket sum (2)'.$basket->basket_sum_gross.' vs. '.$resArray['AMT']*100
+					)
+					);
 				}
 			} else {
 				throw new PaymentException( 'A paypal service error has occurred: ' . $resArray['L_SHORTMESSAGE0'],
@@ -591,7 +597,7 @@ class tx_paypal2commerce {
 			$nvpstr.= '&SHIPTOZIP='.urlencode($addr['zip']);
 			$nvpstr.= '&PHONENUM='.urlencode($addr['phone']);
 			$nvpstr.= '&BUSINESS='.urlencode($addr['company']);
-				
+
 			// call to PayPal to get the Express Checkout token
 			$resArray = $this->hash_call("SetExpressCheckout",$nvpstr);
 			$_SESSION['reshash']=$resArray;
