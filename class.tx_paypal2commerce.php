@@ -252,6 +252,17 @@ class tx_paypal2commerce {
 		}
 		return array();
 	}
+	
+	/**
+	 * checks if two values are equal
+	 *
+	 * @param float $a
+	 * @param float $b
+	 * @return boolean
+	 */
+	function amountEqual($a, $b) {
+		return round($a) == round($b);
+	}
 
 	/**
 	 * Implements 4th and last step of payment processing, which means a request to obtain the payment.
@@ -270,7 +281,7 @@ class tx_paypal2commerce {
 		try {
 			$basket = $GLOBALS['TSFE']->fe_user->tx_commerce_basket;
 			// check if amount has changed
-			if (intval($basket->basket_sum_gross) != intval($_REQUEST['paymentAmount']*100)) {
+			if ($this->amountEqual($basket->basket_sum_gross, $_REQUEST['paymentAmount']*100)) {
 				// wrong sum
 				throw new PaymentException( 'A paypal service error has occurred: Amount mismatch',
 				PAYERR_AMOUNT_MISMATCH,
@@ -283,7 +294,8 @@ class tx_paypal2commerce {
 			$returnResult = false;
 
 			if( $ack == "SUCCESS" ) {
-				if (intval($basket->basket_sum_gross) == intval($resArray['AMT'] * 100)) {
+				
+				if ($this->amountEqual($basket->basket_sum_gross, $resArray['AMT']*100)) {
 					$GLOBALS['TSFE']->fe_user->setKey('ses', 'paypal2commerce_token', NULL );
 					$GLOBALS["TSFE"]->storeSessionData();
 					$returnResult = true;
@@ -349,8 +361,8 @@ class tx_paypal2commerce {
 	function getReadableError() {
 		$back = '';
 		reset( $this->errorMessages );
-		while( list( $k, $v ) = each( $this->errorMessages ) ){
-			$back .= $v;
+		while( list( $k, $message ) = each( $this->errorMessages ) ){
+			$back .= $message;
 		}
 		return $back;
 	}
