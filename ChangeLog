@@ -1,4 +1,8 @@
 (add new changes on top of this file)
+
+13-12-01 Torben Hansen
+	* fixed bug #28936 and #32926, thanks to Michael Knabe
+
 11-06-18 Martin Holtz
 	* fixed Bug #10011, thanks to Georg Schönweger and Simon Schick
 10-07-17 Martin Holtz

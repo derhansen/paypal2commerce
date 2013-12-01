@@ -228,7 +228,7 @@ class tx_paypal2commerce {
 		if ('' != t3lib_div::_POST('tx_commerce_pi3')) {
 			$GLOBALS['TSFE']->fe_user->setKey('ses', 'comment', t3lib_div::removeXSS(strip_tags($pObj->piVars['comment'])));
 			$GLOBALS["TSFE"]->storeSessionData();
-			$this->sendToPaypal( $basket->basket_sum_gross, $pObj->conf['currency'] );
+			$this->sendToPaypal( $basket->getGrossSum(), $pObj->conf['currency'] );
 		}
 		if (!$this->checkFromPaypal()) {
 			return false;
@@ -284,7 +284,7 @@ class tx_paypal2commerce {
 		try {
 			$basket = $GLOBALS['TSFE']->fe_user->tx_commerce_basket;
 			// check if amount has changed
-			if (!$this->amountEqual($basket->basket_sum_gross, $_REQUEST['paymentAmount']*100)) {
+			if (!$this->amountEqual($basket->getGrossSum(), $_REQUEST['paymentAmount']*100)) {
 				// wrong sum
 				throw new PaymentException( 'A paypal service error has occurred: Amount mismatch',
 				PAYERR_AMOUNT_MISMATCH,
@@ -298,7 +298,7 @@ class tx_paypal2commerce {
 
 			if( $ack == "SUCCESS" ) {
 
-				if ($this->amountEqual($basket->basket_sum_gross, $resArray['AMT']*100)) {
+				if ($this->amountEqual($basket->getGrossSum(), $resArray['AMT']*100)) {
 					$GLOBALS['TSFE']->fe_user->setKey('ses', 'paypal2commerce_token', NULL );
 					$GLOBALS["TSFE"]->storeSessionData();
 					$returnResult = true;
@@ -310,7 +310,7 @@ class tx_paypal2commerce {
 						'A paypal service error has occurred: Amount mismatch',
 					PAYERR_AMOUNT_MISMATCH,
 					array(  'error_no'  => PAYERR_AMOUNT_MISMATCH,
-								'error_msg' => 'PAYPAL sum does not match basket sum (2)'.$basket->basket_sum_gross.' vs. '.$resArray['AMT']*100
+								'error_msg' => 'PAYPAL sum does not match basket sum (2)'.$basket->getGrossSum().' vs. '.$resArray['AMT']*100
 					)
 					);
 				}
