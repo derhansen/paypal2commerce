@@ -20,6 +20,8 @@ You will send to Paypal in the last step. There you can login and pay.
 I do not use the adress from paypal at this moment. I am not sure if it makes sense.
 
 ## Extension requirements
+The extension requires Commerce version 0.13.x
+
 This extension uses CURL, so make sure you have installes PHP CURL. If you are unsure if CURL is installed on your
 server, please use the included file test_curl.php to verify.
 

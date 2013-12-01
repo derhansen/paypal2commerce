@@ -2,6 +2,9 @@
 
 13-12-01 Torben Hansen
 	* fixed bug #28936 and #32926, thanks to Michael Knabe
+	* CGL cleanup and moved extension repository to GitHub
+	* Changed state to beta
+	* Release of version 0.6.1
 
 11-06-18 Martin Holtz
 	* fixed Bug #10011, thanks to Georg Schönweger and Simon Schick

@@ -3,6 +3,7 @@
  *  Copyright notice
  *
  *  (c) 2005 - 2010 Martin Holtz typo3@martinholtz.de (et al)
+ *  (c) 2013 Torben Hansen derhansen@gmail.com
  *  All rights reserved
  *
  *  This script is part of the TYPO3 project. The TYPO3 project is
@@ -27,14 +28,13 @@ require_once(PATH_t3lib.'class.t3lib_div.php');
 /**
  * Paypal processsing class for TYPO3 extension commerce. Communication between
  * shop und Paypal via HTTP GET (Name-Value Pair NVP).
- *
  */
 class tx_paypal2commerce {
 
 	/**
 	 * Keeps all currency codes accepted by PayPal's NVP.
 	 *
-	 * @var unknown_type
+	 * @var array
 	 */
 	var $acceptedCurrencies = array( 'AUD', 'CAD', 'EUR', 'GBP', 'JPY', 'USD' );
 
@@ -59,22 +59,21 @@ class tx_paypal2commerce {
 	 */
 	var $pObj;
 
-
 	/**
 	 * Verifies desired currencies to process and puts them into configuration.
 	 *
 	 * @param array $extConf       TYPO3 extension configuration
 	 * @param array $arrCurrencies array with currencies that are accepted by PayPal
 	 */
-	function addCurrencies( &$extConf, &$arrCurrencies ) {
+	function addCurrencies(&$extConf, &$arrCurrencies) {
 		reset($extConf);
-		$keys = array_keys( $extConf, 1 );
-		while ( $key = current( $keys ) ) {
+		$keys = array_keys($extConf, 1);
+		while ($key = current($keys)) {
 			// matching three-digit currency code
-			if (preg_match( '/^payment_currency_([a-z]){3,3}/i', $key) ) {
-				$currencyCode = strtoupper( substr( $key, -3) );
-				if ( in_array ( $currencyCode, $this->acceptedCurrencies ))
-				array_push( $arrCurrencies, $currencyCode );
+			if (preg_match('/^payment_currency_([a-z]){3,3}/i', $key)) {
+				$currencyCode = strtoupper(substr($key, -3));
+				if (in_array($currencyCode, $this->acceptedCurrencies))
+					array_push($arrCurrencies, $currencyCode);
 			}
 			next($keys);
 		}
@@ -85,16 +84,19 @@ class tx_paypal2commerce {
 	 *
 	 * @param resource $cURLHandle initialized cURL ressource
 	 */
-	function checkCurlProxy( &$cURLHandle ) {
+	function checkCurlProxy(&$cURLHandle) {
 		if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['curlUse']
-		&& isset( $GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyServer'] )
-		&& !empty( $GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyServer']) ) {
-			$arrProxy = explode( ':', $GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyServer'] );
-			curl_setopt( $cURLHandle, CURLOPT_PROXYPORT, intval( array_pop( $arrProxy ) ) );
-			curl_setopt( $cURLHandle, CURLOPT_PROXY, implode( ':', $arrProxy ) );
-			if (isset( $GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyUserPass'] )
-			&& !empty( $GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyUserPass'] ) ) {
-				curl_setopt( curl_setopt ( $cURLHandle, CURLOPT_PROXYUSERPWD, $GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyUserPass'] )  );
+			&& isset($GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyServer'])
+			&& !empty($GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyServer'])
+		) {
+			$arrProxy = explode(':', $GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyServer']);
+			curl_setopt($cURLHandle, CURLOPT_PROXYPORT, intval(array_pop($arrProxy)));
+			curl_setopt($cURLHandle, CURLOPT_PROXY, implode(':', $arrProxy));
+			if (isset($GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyUserPass'])
+				&& !empty($GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyUserPass'])
+			) {
+				// @todo check this one
+				curl_setopt(curl_setopt($cURLHandle, CURLOPT_PROXYUSERPWD, $GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyUserPass']));
 			}
 		}
 	}
@@ -107,25 +109,25 @@ class tx_paypal2commerce {
 	 */
 	function checkFromPaypal() {
 		$token = urlencode(t3lib_div::_GP('token'));
-		$paymentAmount =urlencode(t3lib_div::_GP('paymentAmount'));
+		$paymentAmount = urlencode(t3lib_div::_GP('paymentAmount'));
 		$paymentType = urlencode(t3lib_div::_GP('paymentType'));
 		$currCodeType = urlencode(t3lib_div::_GP('currencyCodeType'));
 		$payerID = urlencode(t3lib_div::_GP('PayerID'));
 		$serverName = urlencode($_SERVER['SERVER_NAME']);
-		$nvpstr='&TOKEN='.$token.'&PAYERID='.$payerID.'&PAYMENTACTION='.$paymentType.'&AMT='.$paymentAmount.'&CURRENCYCODE='.$currCodeType.'&IPADDRESS='.$serverName ;
-		$resArray=$this->hash_call("GetExpressCheckoutDetails",$nvpstr);
+		$nvpstr = '&TOKEN=' . $token . '&PAYERID=' . $payerID . '&PAYMENTACTION=' . $paymentType . '&AMT=' . $paymentAmount . '&CURRENCYCODE=' . $currCodeType . '&IPADDRESS=' . $serverName;
+		$resArray = $this->hash_call('GetExpressCheckoutDetails', $nvpstr);
 		$this->resArray = $resArray;
-		$ack = strtoupper($resArray["ACK"]);
-		$returnResult = false;
-		//TODO address validation
+		$ack = strtoupper($resArray['ACK']);
+		$returnResult = FALSE;
+		// @todo address validation
 		try {
-			if($ack!="SUCCESS") {
-				throw new PaymentException( 'A paypal service3 error has occurred: ' . $resArray['L_SHORTMESSAGE0'],
-				PAYERR_PAYPAL_SV,
-				array( 'error_no'  => intval( $resArray['L_ERRORCODE0'] ),
-						   'error_msg' => $resArray['L_LONGMESSAGE0']));
+			if ($ack != 'SUCCESS') {
+				throw new PaymentException('A paypal service3 error has occurred: ' . $resArray['L_SHORTMESSAGE0'],
+					PAYERR_PAYPAL_SV,
+					array('error_no' => intval($resArray['L_ERRORCODE0']),
+						'error_msg' => $resArray['L_LONGMESSAGE0']));
 			} else {
-				$returnResult = true;
+				$returnResult = TRUE;
 			}
 		} catch (PaymentException $e) {
 			$this->debugAndLog($e);
