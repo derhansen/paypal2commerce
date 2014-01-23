@@ -12,6 +12,8 @@ paypal_url = https://www.sandbox.paypal.com/webscr&cmd=_express-checkout&useract
 payment_currency_aud = 0
 # cat=basic/enable; type=boolean; label=Enable payments by currency CAD
 payment_currency_cad = 0
+# cat=basic/enable; type=boolean; label=Enable payments by currency CHF
+payment_currency_chf = 0
 # cat=basic/enable; type=boolean; label=Enable payments by currency EUR
 payment_currency_eur = 1
 # cat=basic/enable; type=boolean; label=Enable payments by currency GBP
